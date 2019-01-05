@@ -8,3 +8,5 @@ import registerServiceWorker from './registerServiceWorker';
 
 ReactDOM.render(<App />, document.getElementById('root'));
 registerServiceWorker();
+
+console.log("pub:", process.env.PUBLIC_URL)

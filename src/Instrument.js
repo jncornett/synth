@@ -33,11 +33,36 @@ class Instrument extends Component {
   }
 
   attack = note => {
-    this.synth.triggerAttack(`${note}${this.props.octave}`, "8n")
+    if (!this.socket || this.socket.readyState !== WebSocket.OPEN) {
+      if (this.socket.readyState === WebSocket.CONNECTING) {
+        return
+      }
+      this.socket = new WebSocket(this.props.socketUrl)
+      this.socket.onmessage = e => {
+        const d = JSON.parse(e.data)
+        this.synth.triggerAttackRelease(`${d.note}${this.props.octave}`, "8n")
+      }
+    }
+    this.socket.send(JSON.stringify({ note }))
   }
 
   release = () => {
     this.synth.triggerRelease()
+  }
+
+  componentDidMount() {
+    this.socket = new WebSocket(this.props.socketUrl)
+    this.socket.onmessage = e => {
+      const d = JSON.parse(e.data)
+      this.synth.triggerAttackRelease(`${d.note}${this.props.octave}`, "8n")
+    }
+  }
+
+  componentWillUnmount() {
+    if (this.socket.readyState !== WebSocket.CLOSED) {
+      this.socket.close()
+    }
+    this.socket = null
   }
 
   render() {

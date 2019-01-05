@@ -15,7 +15,11 @@ class App extends Component {
           <img src={logo} className="App-logo" alt="logo" />
           <h1 className="App-title">Welcome to React</h1>
         </header>
-        <Instrument scale={pentatonicScale} octave={4} />
+        <Instrument
+          scale={pentatonicScale}
+          octave={4}
+          socketUrl="ws://octo.local:4998/cmd"
+        />
       </div>
     );
   }

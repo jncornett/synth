@@ -2,7 +2,6 @@ package main
 
 import (
 	"flag"
-	"fmt"
 	"net/url"
 	"sync"
 	"time"
@@ -16,7 +15,7 @@ func main() {
 		addr     = flag.String("addr", "localhost:4998", "server endpoint")
 		path     = flag.String("path", "/cmd", "server path")
 		name     = flag.String("name", "", "identifier")
-		interval = flag.Duration("ival", time.Second, "interval")
+		interval = flag.Duration("ival", 2*time.Second, "interval")
 	)
 	flag.Parse()
 	u := url.URL{Scheme: "ws", Host: *addr, Path: *path}
@@ -43,7 +42,10 @@ func main() {
 	go func() {
 		defer wg.Done()
 		for t := range time.Tick(*interval) {
-			err := ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s,%v", *name, t)))
+			_ = t
+			_ = *name
+			err := ws.WriteMessage(websocket.TextMessage, []byte(`{"note":"C"}`))
+			// err := ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("%s,%v", *name, t)))
 			if err != nil {
 				log.WithError(err).Error("write")
 				break

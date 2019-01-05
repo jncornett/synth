@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	log "github.com/sirupsen/logrus"
@@ -18,6 +19,7 @@ type Message struct {
 type Conn struct {
 	Conn *websocket.Conn
 	Done chan struct{}
+	*sync.Once
 }
 
 // Broker pairs clients together.
@@ -33,6 +35,7 @@ func NewBroker() *Broker {
 	go func() {
 		for {
 			x := <-b.conns
+			log.WithField("x", x.Conn.RemoteAddr().String()).Info("pending pairing")
 			y := <-b.conns
 			go b.serve(x, y)
 			go b.serve(y, x)
@@ -46,15 +49,18 @@ func NewBroker() *Broker {
 }
 
 func (b *Broker) serve(x, y Conn) {
-	defer close(x.Done)
 	for {
 		_, msg, err := x.Conn.ReadMessage()
 		if err != nil {
 			log.WithError(err).WithField("conn", x).Error("could not decode next message")
+			x.Do(func() { close(x.Done) })
+			b.conns <- y // recycle y
 			return
 		}
 		if err := y.Conn.WriteMessage(websocket.TextMessage, msg); err != nil {
 			log.WithError(err).WithField("conn", x).Error("could not encode next message")
+			y.Do(func() { close(y.Done) })
+			b.conns <- x // recycle x
 			return
 		}
 	}
@@ -67,6 +73,7 @@ func (b *Broker) Add(ws *websocket.Conn) <-chan struct{} {
 		b.conns <- Conn{
 			Conn: ws,
 			Done: done,
+			Once: new(sync.Once),
 		}
 	}()
 	return done
@@ -79,7 +86,11 @@ func main() {
 	)
 	flag.Parse()
 	b := NewBroker()
-	upgrader := websocket.Upgrader{}
+	upgrader := websocket.Upgrader{
+		CheckOrigin: func(*http.Request) bool {
+			return true
+		},
+	}
 	http.HandleFunc(*path, func(w http.ResponseWriter, r *http.Request) {
 		ws, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
